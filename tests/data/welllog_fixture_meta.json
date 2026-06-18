@@ -1,0 +1,17 @@
+{
+  "n": 300,
+  "true_changepoints": [
+    90,
+    180,
+    230
+  ],
+  "true_outliers": [
+    61,
+    115,
+    130
+  ],
+  "seed": 42,
+  "ar1_phi": 0.5,
+  "ar1_sigma_v": 2000.0,
+  "description": "Tiny synthetic fixture mirroring welllog generator, for unit tests only."
+}
