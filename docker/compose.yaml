@@ -36,7 +36,11 @@ services:
   # FastAPI serving layer. On first boot its entrypoint trains+promotes a champion
   # (offline welllog model) so /detect works immediately; later boots reuse the volume.
   api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     image: evdecafs-serve:latest
+    pull_policy: build   # never pull from a registry — the image is built locally above
     depends_on:
       mlflow:
         condition: service_healthy
