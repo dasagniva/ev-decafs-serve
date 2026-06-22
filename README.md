@@ -1,9 +1,10 @@
 # ev-decafs-serve
 
 [![CI](https://github.com/dasagniva/ev-decafs-serve/actions/workflows/ci.yaml/badge.svg)](https://github.com/dasagniva/ev-decafs-serve/actions/workflows/ci.yaml)
-![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue)
+![coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-![status](https://img.shields.io/badge/status-Phase%201%20of%205-yellow)
+![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue)
+![status](https://img.shields.io/badge/status-all%20phases%20complete-brightgreen)
 
 A production MLOps envelope around [EV-DeCAFS](#design-decisions-and-limitations) — a
 published two-phase statistical pipeline for changepoint detection and classification in
@@ -12,70 +13,93 @@ new modeling research; it packages, tests, tracks, serves, containerizes, and mo
 existing, published model. Optimized for legibility, honesty, and reproducibility over feature
 count.
 
-> **Project status:** Phase 1 of 5 complete (packaging, ported algorithm code, tests, CI).
-> Training/MLflow (Phase 2), the FastAPI serving layer (Phase 3), containerization (Phase 4),
-> and drift monitoring (Phase 5) are not built yet — see [Roadmap](#roadmap) below. Sections
-> below that depend on those phases are marked `TBD` rather than filled with placeholder
-> numbers or commands that don't actually work yet.
+> **Project status:** all five phases complete — packaging + tests + CI (1), training pipeline +
+> MLflow registry (2), FastAPI serving (3), Docker/compose containerization (4), and Evidently
+> drift monitoring + load test (5). Results below are from this repo's own evaluation pipeline,
+> not copied from the research repo.
 
 ---
 
 ## Results
 
-`TBD — pending reproduction run.`
+Produced by **this repo's own** `scripts/evaluate.py` (not copied from the research repo).
+Monte-Carlo evaluation of the EV-DeCAFS / FourierPNN classifier on synthetic well-log-style
+series (`n_grid=1000`, `B=40` replications, 27 usable; seed 42):
 
-No training or evaluation pipeline has been run inside this repo yet (that's Phase 2). The
-research repo this is built on reports a balanced accuracy of roughly 0.80 with wide
-Monte-Carlo confidence intervals across replications — intervals that wide are a deliberate
-feature of the evaluation design, not noise to be hidden, because they reflect real sampling
-variability in detecting changepoints in heavy-tailed series, not a single lucky run. This
-table will be filled in with the actual number this repo's own `scripts/evaluate.py` produces,
-logged to MLflow, once Phase 2 lands — never copied from the research repo's own reports.
+| Metric | Mean | 95% CI |
+|---|---|---|
+| Balanced accuracy | **0.785** | [0.50, 1.00] |
+| Matthews corr. coef. | 0.558 | [0.00, 1.00] |
+| AUC-ROC | 0.940 | [0.61, 1.00] |
+
+The balanced accuracy (≈0.79) is in line with the model's published ≈0.80. The **wide
+confidence intervals are deliberate rigour, not noise to hide**: each replication is a fresh
+synthetic series, so the spread reflects real sampling variability in detecting changepoints in
+heavy-tailed, autocorrelated data — far more honest than a single lucky train/test split. A
+larger `B` (and a sweep across all three datasets) tightens the intervals; see
+[Roadmap](#roadmap).
 
 ---
 
 ## Quickstart
 
-The Phase 4 Docker quickstart (`docker compose up` → `curl /detect`) doesn't exist yet. What
-works today is the development quickstart:
+**Docker (serves the API).** From a fresh clone, with only Docker installed:
 
 ```bash
-git clone https://github.com/dasagniva/ev-decafs-serve.git
-cd ev-decafs-serve
+git clone https://github.com/dasagniva/ev-decafs-serve.git && cd ev-decafs-serve
+docker compose -f docker/compose.yaml up -d --build --wait
+curl -X POST localhost:8000/detect -H 'Content-Type: application/json' -d @examples/welllog.json
+```
+
+On first boot the `api` container trains and promotes a quick, **offline** welllog model so
+`/detect` works immediately; later boots reuse the persisted model. The MLflow UI is at
+`localhost:5000`. `GET /health` and `GET /model` describe the served model. For a
+production-quality model, retrain with a full config:
+
+```bash
+docker compose -f docker/compose.yaml exec api \
+  python /app/scripts/train.py --config /app/configs/welllog.yaml --promote
+```
+
+**Local development (no Docker).**
+
+```bash
+git clone https://github.com/dasagniva/ev-decafs-serve.git && cd ev-decafs-serve
 uv sync --all-extras
 uv run pytest --cov=src --cov-fail-under=60
+uv run uvicorn evdecafs_serve.serving.app:app   # needs a champion: see scripts/train.py --promote
 ```
 
 ---
 
 ## Architecture
 
-Target architecture once all phases land (current Phase 1 scope highlighted):
+Architecture (all stages built):
 
 ```mermaid
 flowchart LR
-    subgraph data["data/ (Phase 1 done)"]
+    subgraph data["data/ (done)"]
         A["welllog / oilwell synthetic"] --> C
         B["FRED us_ip_growth"] --> C
         C["loader.py"]
     end
-    subgraph features["features/ (Phase 1 done)"]
+    subgraph features["features/ (done)"]
         D["ar1.py - AR(1) estimation"]
         E["evt.py - EVI field"]
         F["extract.py - feature vector"]
     end
-    subgraph models["models/ (algorithms done; registry I/O is Phase 2)"]
+    subgraph models["models/ (done)"]
         G["decafs.py - ev_decafs DP detector"]
         H["fpnn.py - FourierPNN classifier"]
     end
-    subgraph training["training/ (Phase 2, not built)"]
+    subgraph training["training/ (done)"]
         I["train.py"] --> J["MLflow registry<br/>champion alias"]
         K["evaluate.py - Monte-Carlo + CIs"] --> J
     end
-    subgraph serving["serving/ (Phase 3, not built)"]
+    subgraph serving["serving/ (done)"]
         L["FastAPI - detect / health / model"]
     end
-    subgraph monitoring["monitoring/ (Phase 5, not built)"]
+    subgraph monitoring["monitoring/ (done)"]
         M["Evidently drift checks"]
     end
 
@@ -115,8 +139,8 @@ split: many synthetic series are generated with the same statistical character (
 autocorrelation, jump magnitudes, outlier rates) as empirically estimated from each real
 dataset, the full pipeline is run on each replicate, and the resulting metric distribution
 (mean, std, 2.5/97.5 percentile CI) is reported — see
-`src/evdecafs_serve/training/` (Phase 2, not yet built) and the research repo's
-`evaluation/monte_carlo.py` it's ported from. Wide confidence intervals are reported
+`src/evdecafs_serve/training/evaluate.py` (run via `scripts/evaluate.py --config ...`). Wide
+confidence intervals are reported
 deliberately rather than a single point estimate, because a single run's balanced accuracy is
 not a reliable summary of how the detector behaves across the range of changepoint/outlier
 configurations a real series could present.
@@ -136,6 +160,14 @@ points:
 - **`n_grid=1000`:** the detector's discretisation grid is pinned to the value that actually
   produced every existing reported metric (the research repo's own internal docs claimed 500
   and were stale).
+- **Product, not a second reproduction site:** this repo optimises for a scalable, servable,
+  honestly-measured model; the published-metric reproduction lives in the research repo. The
+  algorithm ports stay byte-faithful, but training-time choices (hand-rolled SMOTE instead of
+  `imbalanced-learn`, FPNN-only evaluation with no comparison baselines) favour a lean image.
+- **Input-drift monitoring:** `GET /monitoring/drift` compares sliding-window summary features
+  (`mean`, `std`, `range`) of recent `/detect` traffic to a reference profile baked into the
+  model bundle at train time, via Evidently's K-S data-drift test. `scripts/make_drift_report.py`
+  writes a standalone HTML report.
 - **Known limitation — no changepoint-location uncertainty:** the only uncertainty signal
   available is the Phase-II classifier's probability margin (sustained vs. recoiled). There is
   no bootstrap or other mechanism for a changepoint-*location* confidence interval; the serving
@@ -152,25 +184,45 @@ uv run ruff check . && uv run ruff format --check .   # lint + format check
 uv run mypy src/evdecafs_serve/serving                 # type check (scope widens as serving/ grows)
 ```
 
-MLflow UI (`uv run mlflow ui`) and the model promotion script (`scripts/promote_model.py`)
-don't exist yet — Phase 2.
+Train, evaluate, promote, and monitor a model:
+
+```bash
+uv run scripts/train.py --config configs/welllog.yaml --promote   # train + register + @champion
+uv run scripts/evaluate.py --config configs/welllog.yaml          # Monte-Carlo metrics -> MLflow
+uv run scripts/promote_model.py --latest                          # move @champion to newest version
+uv run scripts/make_drift_report.py --demo --shift 40000 --output drift.html   # Evidently report
+uv run mlflow ui                                                  # browse runs + registry
+```
+
+**Load test (one short run).** Against the containerised API (or a local `uvicorn`):
+
+```bash
+uvx locust -f locustfile.py --headless -u 20 -r 10 -t 30s --host http://localhost:8000
+```
+
+Indicative numbers from a 30 s run at 20 concurrent users against a single local `uvicorn`
+worker (`n_grid=250`, 170-point payload): **`POST /detect` ≈ 19 req/s, p50 ≈ 0.74 s,
+p95 ≈ 1.2 s, 0 failures.** Latency is dominated by the `ev_decafs` dynamic program
+(O(n·n_grid²)) and is single-worker bound — the honest scaling lever is `n_grid` and/or more
+workers, not the classifier. Modest by design; numbers over flexing.
 
 ---
 
 ## Roadmap
 
-Deliberately deferred, in order:
+All five phases are complete: **(1)** packaging, ported algorithms, tests, CI · **(2)**
+`scripts/train.py` / `scripts/evaluate.py`, MLflow tracking + `@champion` registry alias ·
+**(3)** FastAPI serving (`/detect`, `/health`, `/model`, Pydantic v2 validation, contract
+tests) · **(4)** multi-stage Dockerfile + `docker compose` (api + mlflow services),
+containerized smoke test in CI, 3-command quickstart · **(5)** Evidently input-drift monitoring
+(`/monitoring/drift`, HTML report), load test, coverage gate at 80%.
 
-- **Phase 2** — `scripts/train.py` / `scripts/evaluate.py`, MLflow tracking + `@champion`
-  registry alias, the real Monte-Carlo reproduction run (human-confirmed before any number goes
-  in the Results table above).
-- **Phase 3** — FastAPI serving layer (`/detect`, `/health`, `/model`), Pydantic v2 request
-  validation, contract tests.
-- **Phase 4** — multi-stage Dockerfile, `docker compose`, containerized smoke test, the 3-command
-  quickstart this README currently lacks.
-- **Phase 5** — Evidently-based input drift monitoring, one short load test, final polish of
-  this README (this section will shrink as each item lands).
+Deliberately deferred (honest scope): a full `B=200`, `n_grid=1000` reproduction sweep across
+all three datasets (the Results table reports a `B=40` welllog run — larger `B` tightens the
+CIs); per-changepoint **location** confidence intervals (no validated method exists upstream);
+authentication / rate-limiting on the API; and a hosted MLflow backend (local SQLite today).
 
 See [`ROADMAP-repo1-ev-decafs-serve.md`](ROADMAP-repo1-ev-decafs-serve.md) for full phase
-acceptance criteria, and [`INTAKE.md`](INTAKE.md) for the research-code intake notes that
-informed the decisions above.
+acceptance criteria, [`DECISIONS.md`](DECISIONS.md) for design decisions (incl. the
+product-vs-reproduction framing), and [`INTAKE.md`](INTAKE.md) for the research-code intake
+notes.

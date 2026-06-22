@@ -1,0 +1,41 @@
+# Fast, offline bootstrap config used on first container start (docker/entrypoint.sh).
+# Trains a real-but-quick welllog model so a fresh `docker compose up` has a working champion
+# without any network access. Retrain with a full config for a production-quality model:
+#   docker compose exec api python /app/scripts/train.py --config /app/configs/welllog.yaml --promote
+dataset:
+  name: welllog
+  cache_path: data/raw/welllog.csv
+  train_fraction: 0.75
+  random_seed: 42
+
+phase1:
+  alpha_0_mode: bic
+  bic_multiplier: 1.5
+  tune_bic: false          # skip the sweep for speed
+  n_grid: 250              # smaller grid -> fast first boot (DECISIONS.md #3: prod uses 1000)
+  window_halfwidth_w: 50
+  gpd_percentile_q0: 0.90
+
+labelling:
+  kappa_mu_percentile: 75
+  kappa_S: 0.5
+  window_L: 5
+  bocpd_threshold: 0.3
+  bocpd_tolerance_fraction: 0.02
+
+fpnn:
+  J_harmonics: 10
+  scaling_range: [-0.5, 0.5]
+
+smote:
+  enabled: true
+  k_neighbors: 5
+  random_state: 42
+
+monte_carlo:        # unused by training; kept for schema completeness
+  B: 10
+  series_n: 800
+  n_changepoints: 8
+  n_outliers: 8
+  train_fraction: 0.75
+  seed: 42

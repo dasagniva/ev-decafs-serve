@@ -1,0 +1,51 @@
+name: evdecafs-serve
+
+services:
+  # MLflow tracking + registry server (and UI at http://localhost:5000).
+  mlflow:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: evdecafs-serve:latest
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --artifacts-destination
+      - /mlflow/artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health').status==200 else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # FastAPI serving layer. On first boot its entrypoint trains+promotes a champion
+  # (offline welllog model) so /detect works immediately; later boots reuse the volume.
+  api:
+    image: evdecafs-serve:latest
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    command: ["sh", "/app/docker/entrypoint.sh"]
+    environment:
+      EVDECAFS_MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      EVDECAFS_BOOTSTRAP_CONFIG: "/app/configs/bootstrap.yaml"
+    ports:
+      - "8000:8000"
+
+volumes:
+  mlflow-data:

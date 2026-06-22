@@ -32,4 +32,30 @@ jobs:
         run: uv run mypy src/evdecafs_serve/serving
 
       - name: Tests with coverage
-        run: uv run pytest --cov=src --cov-fail-under=60
+        run: uv run pytest --cov=src --cov-fail-under=80
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image and start the stack
+        run: docker compose -f docker/compose.yaml up -d --build --wait --wait-timeout 300
+
+      - name: Smoke test /health
+        run: curl -fsS localhost:8000/health
+
+      - name: Smoke test /detect with an example payload
+        run: |
+          curl -fsS -X POST localhost:8000/detect \
+            -H 'Content-Type: application/json' \
+            -d @examples/welllog.json \
+          | python -c "import sys, json; d = json.load(sys.stdin); assert set(d) >= {'changepoints', 'n_changepoints', 'model_version'}, d; print('detect ok:', d['n_changepoints'], 'changepoints')"
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose -f docker/compose.yaml logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker/compose.yaml down -v

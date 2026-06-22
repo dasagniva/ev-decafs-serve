@@ -1,0 +1,43 @@
+# Well-log nuclear-response benchmark (synthetic surrogate; sensor-style).
+dataset:
+  name: welllog
+  cache_path: data/raw/welllog.csv
+  train_fraction: 0.75
+  random_seed: 42
+
+phase1:
+  alpha_0_mode: bic
+  bic_multiplier: 2.0
+  tune_bic: true
+  bic_sweep_values: [0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 20.0]
+  expected_n_changepoints: 12
+  window_halfwidth_w: 50
+  gpd_percentile_q0: 0.90
+  n_grid: 1000
+
+labelling:
+  kappa_mu_percentile: 75
+  kappa_S: 0.5
+  window_L: 5
+  bocpd_threshold: 0.3
+  bocpd_tolerance_fraction: 0.02
+
+fpnn:
+  J_harmonics: 10
+  scaling_range: [-0.5, 0.5]
+
+smote:
+  enabled: true
+  k_neighbors: 5
+  random_state: 42
+
+monte_carlo:
+  B: 200
+  series_n: 2000
+  n_changepoints: 12
+  n_outliers: 15
+  phi: 0.5
+  sigma_v: 2000.0
+  sigma_eta: 100.0
+  train_fraction: 0.75
+  seed: 42

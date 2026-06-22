@@ -8,6 +8,9 @@ __pycache__/
 htmlcov/
 *.egg-info/
 *.md
+
+!README.md
+
 .venv/
 
 mlruns/
