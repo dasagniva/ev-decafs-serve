@@ -18,6 +18,13 @@ services:
       - 0.0.0.0
       - --port
       - "5000"
+    environment:
+      # mlflow's Host-header allowlist (DNS-rebinding protection) defaults to localhost +
+      # literal private IPs only — it doesn't know the compose service DNS name "mlflow", so the
+      # api container's requests to http://mlflow:5000 get a 403 without this. Setting this env
+      # var *replaces* (not extends) the default list, so localhost/127.0.0.1 must be re-added
+      # here too, or the host-side MLflow UI (localhost:5000) breaks.
+      MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow,mlflow:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*"
     volumes:
       - mlflow-data:/mlflow
     ports:
