@@ -149,7 +149,7 @@ configurations a real series could present.
 
 ## Design decisions and limitations
 
-Full reasoning and rejected alternatives are logged in [`DECISIONS.md`](DECISIONS.md). Key
+Full reasoning and rejected alternatives are logged in `DECISIONS.md`. Key
 points:
 
 - **Consumption mode:** algorithms are extracted and repackaged from the published research
@@ -222,7 +222,6 @@ all three datasets (the Results table reports a `B=40` welllog run — larger `B
 CIs); per-changepoint **location** confidence intervals (no validated method exists upstream);
 authentication / rate-limiting on the API; and a hosted MLflow backend (local SQLite today).
 
-See [`ROADMAP-repo1-ev-decafs-serve.md`](ROADMAP-repo1-ev-decafs-serve.md) for full phase
-acceptance criteria, [`DECISIONS.md`](DECISIONS.md) for design decisions (incl. the
-product-vs-reproduction framing), and [`INTAKE.md`](INTAKE.md) for the research-code intake
-notes.
+See `ROADMAP-repo1-ev-decafs-serve.md` for full phase acceptance criteria, `DECISIONS.md` for
+design decisions (incl. the product-vs-reproduction framing), and `INTAKE.md` for the
+research-code intake notes.

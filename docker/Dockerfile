@@ -22,7 +22,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Then install the project itself.
+# Then install the project itself. README.md is required by the build backend
+# (pyproject `readme = "README.md"`), so it must be present before the project install.
+COPY README.md ./
 COPY src ./src
 COPY configs ./configs
 COPY scripts ./scripts
