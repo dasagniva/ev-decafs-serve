@@ -44,6 +44,11 @@ RUN useradd --create-home --uid 1000 appuser \
     && chown appuser:appuser /mlflow   # fresh named volume inherits this ownership
 
 WORKDIR /app
+# WORKDIR creates /app as root before the COPY below; COPY --chown only chowns the files it
+# copies in, not the pre-existing /app directory entry itself. Without this, appuser can read
+# the chowned files but can't create new top-level entries (e.g. the data/ cache dir written
+# at runtime by data/loader.py).
+RUN chown appuser:appuser /app
 COPY --from=builder --chown=appuser:appuser /app /app
 COPY --chown=appuser:appuser docker/entrypoint.sh /app/docker/entrypoint.sh
 RUN chmod +x /app/docker/entrypoint.sh
