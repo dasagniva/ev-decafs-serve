@@ -66,7 +66,7 @@ docker compose -f docker/compose.yaml exec api \
 ```bash
 git clone https://github.com/dasagniva/ev-decafs-serve.git && cd ev-decafs-serve
 uv sync --all-extras
-uv run pytest --cov=src --cov-fail-under=60
+uv run pytest --cov=src --cov-fail-under=80
 uv run uvicorn evdecafs_serve.serving.app:app   # needs a champion: see scripts/train.py --promote
 ```
 
